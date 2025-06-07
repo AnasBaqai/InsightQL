@@ -1,0 +1,72 @@
+version: '3'
+
+services:
+  nestapp:
+    container_name: ctyd-nestapp
+    image: ctyd-nestapp
+    build:
+      dockerfile: Dockerfile
+      context: .
+    ports:
+      - '5000:5000'
+    env_file:
+      - .env
+    networks:
+      - ctyd_bridge
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - postgres
+      - mongodb
+
+  postgres:
+    container_name: ctyd-postgres
+    image: postgres:12
+    ports:
+      - '5432:5432'
+    env_file:
+      - .env
+    networks:
+      - ctyd_bridge
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./src/dbDumpFile:/dbDumpFile
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: ctyd-pgadmin4
+    env_file:
+      - .env
+    networks:
+      - ctyd_bridge
+    ports:
+      - '5050:80'
+    depends_on:
+      - postgres
+
+  mongodb:
+    image: mongo:6.0
+    container_name: ctyd-mongodb
+    env_file:
+      - .env
+    networks:
+      - ctyd_bridge
+    ports:
+      - '27017:27017'
+    healthcheck:
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - mongodbdata:/data/db
+
+networks:
+  ctyd_bridge:
+    driver: bridge
+
+volumes:
+  pgdata: {}
+  mongodbdata: {}
