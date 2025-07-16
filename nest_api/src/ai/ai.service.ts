@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { OpenAI } from 'langchain/llms/openai';
+import { ChatGroq } from '@langchain/groq';
 import { createSqlAgent, SqlToolkit } from 'langchain/agents/toolkits/sql';
 import { SqlDatabase } from 'langchain/sql_db';
 import { DataSource } from 'typeorm';
@@ -15,7 +16,7 @@ import { ChatHistoryResponseDto } from './dto/chatHistory-response.dto';
 @Injectable()
 export class AiService implements OnModuleInit {
   private executor: any;
-  private model: OpenAI;
+  private model: any;
   private toolkit: SqlToolkit;
 
   constructor(
@@ -34,10 +35,25 @@ export class AiService implements OnModuleInit {
       appDataSource: this.sqliteDataSource,
     });
 
-    this.model = new OpenAI({
-      openAIApiKey: process.env.OPENAI_API_KEY,
-      temperature: 0,
-    });
+    // Configure LLM based on environment variables
+    const llmProvider = process.env.LLM_PROVIDER || 'groq'; // Default to Groq
+
+    if (llmProvider === 'groq') {
+      this.model = new ChatGroq({
+        apiKey: process.env.GROQ_API_KEY,
+        model: process.env.GROQ_MODEL || 'mixtral-8x7b-32768', // Better for structured tasks
+        temperature: 0,
+        maxTokens: 2048,
+        streaming: false,
+      });
+    } else if (llmProvider === 'openai') {
+      this.model = new OpenAI({
+        openAIApiKey: process.env.OPENAI_API_KEY,
+        temperature: 0,
+      });
+    } else {
+      throw new Error(`Unsupported LLM provider: ${llmProvider}`);
+    }
 
     this.toolkit = new SqlToolkit(postgresDb);
 
@@ -50,16 +66,34 @@ export class AiService implements OnModuleInit {
 
   async chat(prompt: string): Promise<AiResponse> {
     let aiResponse = new AiResponse();
+    aiResponse.prompt = prompt; // Set the prompt early to avoid validation errors
 
     try {
+      console.log('Starting chat with prompt:', prompt);
+      console.log('LLM Provider:', process.env.LLM_PROVIDER);
+
       const result = await this.executor.call({ input: prompt });
+      console.log('LLM execution completed');
 
-      // dummy result
-      // const result = RESULT;
+      // Check if we got a valid result
+      if (!result || !result.intermediateSteps) {
+        console.log('No intermediate steps found in result');
+        aiResponse.error = 'No response from LLM. Please try again.';
+        return aiResponse;
+      }
 
-      result.intermediateSteps.forEach((step) => {
+      console.log(
+        'Number of intermediate steps:',
+        result.intermediateSteps.length,
+      );
+
+      // Initialize with defaults to avoid validation errors
+      aiResponse.sqlQuery = 'No SQL generated';
+      aiResponse.result = [];
+
+      result.intermediateSteps.forEach((step, index) => {
+        console.log(`Step ${index}:`, step.action?.tool);
         if (step.action.tool === 'query-sql') {
-          aiResponse.prompt = prompt;
           aiResponse.sqlQuery = step.action.toolInput;
           aiResponse.sqlQuery = aiResponse.sqlQuery
             .replace(/\\/g, '')
@@ -73,32 +107,29 @@ export class AiService implements OnModuleInit {
               aiResponse.result = observation;
             }
           } catch (error) {
-            console.log(error);
+            console.log('Error parsing observation:', error);
           }
         }
       });
 
-      // console.log(
-      //   `Intermediate steps ${JSON.stringify(
-      //     result.intermediateSteps,
-      //     null,
-      //     2,
-      //   )}`,
-      // );
+      // Only save to database if we have valid data
+      if (aiResponse.sqlQuery && aiResponse.sqlQuery !== 'No SQL generated') {
+        const chatHistory = new this.chatHistoryModel({
+          prompt: aiResponse.prompt,
+          sqlQuery: aiResponse.sqlQuery,
+          queryResult: aiResponse.result,
+        });
 
-      const chatHistory = new this.chatHistoryModel({
-        prompt: aiResponse.prompt,
-        sqlQuery: aiResponse.sqlQuery,
-        queryResult: aiResponse.result,
-      });
-
-      await chatHistory.save();
+        await chatHistory.save();
+        console.log('Chat history saved successfully');
+      } else {
+        console.log('Skipping database save - no valid SQL generated');
+      }
 
       return aiResponse;
     } catch (e) {
-      console.log(e + ' ' + 'my error message');
+      console.log('Error in chat method:', e);
       aiResponse.error = 'Server error. Try again with a different prompt.';
-
       return aiResponse;
     }
   }

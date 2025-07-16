@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import ChatForm from "@/components/ChatForm";
 import DataTable from "@/components/DataTable";
@@ -240,7 +240,7 @@ export default function Home() {
     const fetchChatHistory = async () => {
       try {
         const response = await axios.get(
-          "http://localhost:5000/api/ai/getAllChatHistory"
+          "http://localhost:3001/api/ai/getAllChatHistory"
         );
         setChatHistory(response.data.data);
         // console.log(response.data.data);
@@ -272,57 +272,56 @@ export default function Home() {
 
   return (
     <>
+      <main className="text-slate-100 overflow-hidden w-full h-full relative flex z-0 bg-slate-200 dark:bg-slate-800">
+        <Navbar />
+        <Sidebar {...sidebarProps} />
 
-        <main className="text-slate-100 overflow-hidden w-full h-full relative flex z-0 bg-slate-200 dark:bg-slate-800">
-          <Navbar />
-          <Sidebar {...sidebarProps} />
-
-          {showModal && selectedQueryHistory && (
-            <div className="fixed w-full h-full z-50 overflow-auto bg-gray-700/50 flex">
-              <ModalForTable
-                show={showModal}
-                onClose={() => setShowModal(false)}
-                response={selectedQueryHistory}
-              />
-            </div>
-          )}
-          <section className="flex flex-col p-6 mt-8 w-full h-full justify-between">
-            <div className="mt-8 flex flex-col flex-1">
-              {response?.error && response?.error !== "" && (
-                <p className="rounded-xl bg-red-500 text-white p-6 mb-8">
-                  {response.error}
-                </p>
+        {showModal && selectedQueryHistory && (
+          <div className="fixed w-full h-full z-50 overflow-auto bg-gray-700/50 flex">
+            <ModalForTable
+              show={showModal}
+              onClose={() => setShowModal(false)}
+              response={selectedQueryHistory}
+            />
+          </div>
+        )}
+        <section className="flex flex-col p-6 mt-8 w-full h-full justify-between">
+          <div className="mt-8 flex flex-col flex-1">
+            {response?.error && response?.error !== "" && (
+              <p className="rounded-xl bg-red-500 text-white p-6 mb-8">
+                {response.error}
+              </p>
+            )}
+            <div className="relative flex flex-col flex-1 rounded-2xl bg-lightColor dark:bg-slate-900 overflow-hidden overflow-y-auto overflow-x-auto scrollbar-thin scrollbar-track-slate-100 scrollbar-thumb-slate-400 dark:scrollbar-track-slate-950 dark:scrollbar-thumb-slate-700 scrollbar-track-rounded-lg scrollbar-thumb-rounded-lg">
+              {waitingResponse || firstRun ? (
+                <div className="flex flex-col items-center justify-center h-full">
+                  {waitingResponse && (
+                    <Preloader
+                      backgroundColor="fill-slate-800"
+                      fillColor="fill-slate-600"
+                    />
+                  )}
+                  {firstRun && (
+                    <p className="text-slate-500 mt-4">
+                      Type a prompt to get started
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <DataTable data={response?.result} />
               )}
-              <div className="relative flex flex-col flex-1 rounded-2xl bg-lightColor dark:bg-slate-900 overflow-hidden overflow-y-auto overflow-x-auto scrollbar-thin scrollbar-track-slate-100 scrollbar-thumb-slate-400 dark:scrollbar-track-slate-950 dark:scrollbar-thumb-slate-700 scrollbar-track-rounded-lg scrollbar-thumb-rounded-lg">
-                {waitingResponse || firstRun ? (
-                  <div className="flex flex-col items-center justify-center h-full">
-                    {waitingResponse && (
-                      <Preloader
-                        backgroundColor="fill-slate-800"
-                        fillColor="fill-slate-600"
-                      />
-                    )}
-                    {firstRun && (
-                      <p className="text-slate-500 mt-4">
-                        Type a prompt to get started
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <DataTable data={response?.result} />
-                )}
-              </div>
             </div>
-            <div className="mb-12 mt-8">
-              <div className="p-4 bg-lightColor dark:bg-slate-900 rounded-xl w-full mb-8 scrollbar-thin scrollbar-track-slate-100 scrollbar-thumb-slate-400 dark:scrollbar-track-slate-950 dark:scrollbar-thumb-slate-700 scrollbar-track-rounded-lg scrollbar-thumb-rounded-lg">
-                <SqlViewer content={getSqlViewerContent()} />
-              </div>
-              <div className="flex rounded-2xl flex-col relative">
-                <ChatForm onPrompt={onPrompt} />
-              </div>
+          </div>
+          <div className="mb-12 mt-8">
+            <div className="p-4 bg-lightColor dark:bg-slate-900 rounded-xl w-full mb-8 scrollbar-thin scrollbar-track-slate-100 scrollbar-thumb-slate-400 dark:scrollbar-track-slate-950 dark:scrollbar-thumb-slate-700 scrollbar-track-rounded-lg scrollbar-thumb-rounded-lg">
+              <SqlViewer content={getSqlViewerContent()} />
             </div>
-          </section>
-        </main>
+            <div className="flex rounded-2xl flex-col relative">
+              <ChatForm onPrompt={onPrompt} />
+            </div>
+          </div>
+        </section>
+      </main>
     </>
   );
 }
